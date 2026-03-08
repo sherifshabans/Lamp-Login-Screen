@@ -1,0 +1,773 @@
+
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import kotlin.math.*
+
+// ══════════════════════════════════════════════════════════════════
+//  PALETTE
+// ══════════════════════════════════════════════════════════════════
+private val BG_TOP      = Color(0xFF080A0F)
+private val BG_BOT      = Color(0xFF0E1118)
+private val SHADE_OFF   = Color(0xFF1E2028)
+private val SHADE_ON    = Color(0xFFB8965A)
+private val SHADE_LIT   = Color(0xFFFFE0A0)
+private val POLE_COL    = Color(0xFF888888)
+private val BASE_COL    = Color(0xFFAAAAAA)
+private val CORD_COL    = Color(0xFF888888)
+private val KNOB_COL    = Color(0xFFAAAAAA)
+private val GLOW_WARM   = Color(0xFFFFD060)
+private val ACCENT      = Color(0xFFFFB347)
+private val CARD_BG     = Color(0xFF12151C)
+private val INPUT_BG    = Color(0xFF1A1E28)
+private val HINT_COL    = Color(0xFF4A5068)
+
+// Face colors
+private val SKIN_COL    = Color(0xFFFFD59E)   // warm skin tone
+private val SKIN_DARK   = Color(0xFFE5B880)   // shadow
+private val EYE_WHITE   = Color(0xFFFFF8F0)
+private val EYE_IRIS    = Color(0xFF4A90D9)   // blue iris
+private val EYE_PUPIL   = Color(0xFF1A1A1A)
+private val BROW_COL    = Color(0xFF6B4C2A)
+private val MOUTH_COL   = Color(0xFFCC6655)
+private val TONGUE_COL  = Color(0xFFFF7A8A)
+private val TEETH_COL   = Color(0xFFFFFAF5)
+private val CHEEK_COL   = Color(0xFFFFAA99)
+private val TEAR_COL    = Color(0xFF88BBFF)
+
+// ══════════════════════════════════════════════════════════════════
+//  MAIN SCREEN
+// ══════════════════════════════════════════════════════════════════
+@Composable
+fun LampLoginScreen(
+    activity: Activity? = null,
+    viewModel: LoginViewModel = hiltViewModel(),
+    navController: NavController,
+    onLoginSuccess: () -> Unit
+) {
+    val state by viewModel.state.collectAsState()
+
+    var isOn            by remember { mutableStateOf(false) }
+    var showCard        by remember { mutableStateOf(false) }
+    var cordPull        by remember { mutableFloatStateOf(0f) }
+    var isDragging      by remember { mutableStateOf(false) }
+    var email           by remember { mutableStateOf("") }
+    var password        by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    // mood: 0 = sad (off), 1 = happy (on)
+    val mood by animateFloatAsState(
+        targetValue   = if (isOn) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 180f),
+        label         = "mood"
+    )
+    val glowA by animateFloatAsState(
+        targetValue   = if (isOn) 1f else 0f,
+        animationSpec = tween(700, easing = FastOutSlowInEasing),
+        label         = "glow"
+    )
+    val cordA by animateFloatAsState(
+        targetValue   = cordPull,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = 300f),
+        label         = "cord"
+    )
+    val tiltA by animateFloatAsState(
+        targetValue   = if (isDragging) cordPull * 4f else 0f,
+        animationSpec = spring(dampingRatio = 0.3f, stiffness = 700f),
+        label         = "tilt"
+    )
+
+    val inf = rememberInfiniteTransition(label = "inf")
+    val pulse by inf.animateFloat(
+        0.75f, 1f,
+        infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulse"
+    )
+    // blink animation when happy
+    val blinkA by inf.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(
+            keyframes {
+                durationMillis = 4000
+                0f at 0; 0f at 3600; 1f at 3700; 0f at 3800; 0f at 4000
+            }
+        ),
+        label = "blink"
+    )
+
+    LaunchedEffect(isOn) {
+        if (isOn) { kotlinx.coroutines.delay(480); showCard = true }
+        else showCard = false
+    }
+    LaunchedEffect(state) {
+        if (state is LoginState.Success) {
+            navController.navigate("wallet") {
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+            }
+        }
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        try {
+            GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                .getResult(ApiException::class.java)?.let { acc ->
+                    acc.idToken?.let { tok ->
+                        viewModel.googleSignIn(tok, acc.displayName ?: "", acc.email ?: "",
+                            acc.photoUrl?.toString())
+                    }
+                }
+        } catch (_: ApiException) {}
+    }
+
+    // ════════════════════════════════════════════════════════════
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(BG_TOP, BG_BOT)))
+    ) {
+        // ambient warm glow
+        if (glowA > 0f) {
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .height(380.dp)
+                .align(Alignment.TopCenter)
+                .background(Brush.radialGradient(
+                    listOf(
+                        GLOW_WARM.copy(alpha = 0.16f * glowA * pulse),
+                        Color.Transparent
+                    ), radius = 900f
+                ))
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(32.dp))
+
+            // ── LAMP ──────────────────────────────────────────
+            // The whole lamp + cord area is one tall box.
+            // The cord is draggable anywhere inside it.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(360.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                // ── Canvas: draws lamp + cord ─────────────────
+                Canvas(
+                    modifier = Modifier
+                        .width(240.dp)
+                        .fillMaxHeight()
+                        .graphicsLayer {
+                            rotationZ       = tiltA
+                            transformOrigin = TransformOrigin(0.5f, 0f)
+                        }
+                ) {
+                    val W  = size.width
+                    val H  = size.height
+                    val cx = W / 2f
+
+                    val wireTopY     = 0f
+                    val wireBottomY  = H * 0.10f
+                    val shadeTopY    = wireBottomY
+                    val shadeBottomY = H * 0.50f
+                    val shdTopHalf   = W * 0.30f
+                    val shdBotHalf   = W * 0.48f
+                    val cordY0       = shadeBottomY + 4f
+                    val cordDrop     = H * 0.24f + cordA * H * 0.20f
+                    val sway         = sin(cordA * PI.toFloat() * 2.2f) * 16f
+                    val cordX1       = cx + sway
+                    val cordY1       = cordY0 + cordDrop
+
+                    // ── ceiling wire ──────────────────────────
+                    drawRoundRect(
+                        color        = POLE_COL.copy(alpha = 0.5f),
+                        topLeft      = Offset(cx - 2.5f, wireTopY),
+                        size         = Size(5f, wireBottomY - wireTopY),
+                        cornerRadius = CornerRadius(3f)
+                    )
+
+                    // ── light cone ────────────────────────────
+                    if (glowA > 0f) {
+                        val a = glowA * pulse * 0.22f
+                        drawPath(Path().apply {
+                            moveTo(cx - shdBotHalf, shadeBottomY)
+                            lineTo(cx + shdBotHalf, shadeBottomY)
+                            lineTo(cx + W * 0.92f,  H * 0.94f)
+                            lineTo(cx - W * 0.92f,  H * 0.94f)
+                            close()
+                        }, Brush.verticalGradient(
+                            listOf(GLOW_WARM.copy(alpha = a * 1.9f), Color.Transparent),
+                            startY = shadeBottomY, endY = H * 0.94f
+                        ))
+                    }
+
+                    // ── shade inner glow ──────────────────────
+                    if (glowA > 0f) {
+                        drawPath(Path().apply {
+                            moveTo(cx - shdTopHalf, shadeTopY); lineTo(cx + shdTopHalf, shadeTopY)
+                            lineTo(cx + shdBotHalf, shadeBottomY); lineTo(cx - shdBotHalf, shadeBottomY)
+                            close()
+                        }, Brush.radialGradient(
+                            listOf(
+                                SHADE_LIT.copy(alpha = glowA * pulse * 0.95f),
+                                SHADE_ON.copy(alpha  = glowA * 0.5f),
+                                Color.Transparent
+                            ),
+                            center = Offset(cx, (shadeTopY + shadeBottomY) * 0.42f),
+                            radius = shdBotHalf * 1.2f
+                        ))
+                    }
+
+                    // ── shade body ────────────────────────────
+                    drawPath(Path().apply {
+                        moveTo(cx - shdTopHalf, shadeTopY); lineTo(cx + shdTopHalf, shadeTopY)
+                        lineTo(cx + shdBotHalf, shadeBottomY); lineTo(cx - shdBotHalf, shadeBottomY)
+                        close()
+                    }, lerp(SHADE_OFF, SHADE_ON, glowA))
+
+                    // shade rims
+                    drawLine(POLE_COL.copy(alpha = 0.55f),
+                        Offset(cx - shdTopHalf, shadeTopY), Offset(cx + shdTopHalf, shadeTopY),
+                        6f, cap = StrokeCap.Round)
+                    drawLine(POLE_COL.copy(alpha = 0.3f),
+                        Offset(cx - shdBotHalf, shadeBottomY), Offset(cx + shdBotHalf, shadeBottomY),
+                        4f, cap = StrokeCap.Round)
+                    // shade edge highlights
+                    drawLine(Color.White.copy(alpha = 0.06f),
+                        Offset(cx - shdTopHalf, shadeTopY), Offset(cx - shdBotHalf, shadeBottomY), 2f)
+                    drawLine(Color.White.copy(alpha = 0.06f),
+                        Offset(cx + shdTopHalf, shadeTopY), Offset(cx + shdBotHalf, shadeBottomY), 2f)
+
+                    // ── FACE ─────────────────────────────────
+                    val faceCY = (shadeTopY + shadeBottomY) * 0.46f
+                    val fu     = W * 0.082f
+                    drawFace(
+                        cx      = cx,
+                        cy      = faceCY,
+                        fu      = fu,
+                        mood    = mood,
+                        blinkA  = blinkA,
+                        glowA   = glowA
+                    )
+
+                    // ── cord ──────────────────────────────────
+                    drawPath(Path().apply {
+                        moveTo(cx, cordY0)
+                        quadraticBezierTo(
+                            cx + sway * 0.5f + 10f, cordY0 + cordDrop * 0.5f,
+                            cordX1, cordY1
+                        )
+                    }, CORD_COL, style = Stroke(4f, cap = StrokeCap.Round))
+
+                    // knob
+                    drawCircle(Color.Black.copy(alpha = 0.3f), 11f, Offset(cordX1 + 1f, cordY1 + 2f))
+                    drawCircle(KNOB_COL, 10f, Offset(cordX1, cordY1))
+                    drawCircle(Color.White.copy(alpha = 0.2f), 10f, Offset(cordX1, cordY1),
+                        style = Stroke(2.5f))
+                    drawCircle(Color.White.copy(alpha = 0.4f), 4f,
+                        Offset(cordX1 - 3f, cordY1 - 3f))
+                }
+
+                // ── DRAG ZONE = full tall box = entire cord area ──
+                // User can touch ANYWHERE in this box to drag the cord.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.55f)
+                        .fillMaxHeight()
+                        .align(Alignment.TopCenter)
+                        // push the touch zone down to start at shade bottom (~50% height)
+                        .padding(top = (360 * 0.50f).dp)
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragEnd    = { isDragging = false; if (cordPull > 0.42f) isOn = !isOn; cordPull = 0f },
+                                onDragCancel = { isDragging = false; cordPull = 0f }
+                            ) { _, drag ->
+                                if (drag.y > 0f) {
+                                    isDragging = true
+                                    cordPull = (cordPull + drag.y / 220f).coerceIn(0f, 1f)
+                                }
+                            }
+                        }
+                )
+            }
+
+            // hint when off
+            AnimatedVisibility(!showCard, enter = fadeIn(), exit = fadeOut(tween(180))) {
+                Text("↑  pull the cord  ↑",
+                    modifier      = Modifier.padding(top = 6.dp, bottom = 20.dp),
+                    color         = Color.White.copy(alpha = 0.2f),
+                    fontSize      = 12.sp,
+                    fontWeight    = FontWeight.Medium,
+                    letterSpacing = 2.sp
+                )
+            }
+
+            // ── LOGIN CARD ─────────────────────────────────────
+            AnimatedVisibility(
+                visible = showCard,
+                enter   = fadeIn(tween(400)) +
+                        slideInVertically(tween(460, easing = FastOutSlowInEasing)) { it / 3 } +
+                        expandVertically(tween(460, easing = FastOutSlowInEasing), Alignment.Top),
+                exit    = fadeOut(tween(260)) +
+                        slideOutVertically(tween(260)) { it / 3 } +
+                        shrinkVertically(tween(260))
+            ) {
+                LoginCard(
+                    email            = email,
+                    onEmailChange    = { email = it },
+                    password         = password,
+                    onPasswordChange = { password = it },
+                    passwordVisible  = passwordVisible,
+                    onVisToggle      = { passwordVisible = !passwordVisible },
+                    isLoading        = state.isLoading,
+                    glowA            = glowA,
+                    pulse            = pulse,
+                    errorMessage     = (state as? LoginState.Error)?.message,
+                    onLogin          = { viewModel.login(email, password) },
+                    onGoogleLogin    = {
+                        activity?.let { act ->
+                            val gso = GoogleSignInOptions
+                                .Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                .requestIdToken("276179736666-ebajm4j955e3d9o14ogklj3gm5o8dmnr.apps.googleusercontent.com")
+                                .requestEmail().build()
+                            val cl = GoogleSignIn.getClient(act, gso)
+                            cl.signOut().addOnCompleteListener { launcher.launch(cl.signInIntent) }
+                        }
+                    },
+                    onSignUp = { navController.navigate("signup") }
+                )
+            }
+
+            Spacer(Modifier.height(40.dp))
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  FACE DRAWING
+//  mood 0 = sad, 1 = happy  — everything lerps between the two
+// ══════════════════════════════════════════════════════════════════
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
+    cx: Float, cy: Float, fu: Float,
+    mood: Float, blinkA: Float, glowA: Float
+) {
+    // ── face circle (skin) ────────────────────────────────────────
+    val faceR = fu * 2.0f
+    // shadow
+    drawCircle(Color.Black.copy(alpha = 0.25f), faceR + 4f, Offset(cx + 2f, cy + 3f))
+    // base skin
+    drawCircle(
+        Brush.radialGradient(
+            listOf(SKIN_COL, SKIN_DARK),
+            center = Offset(cx - fu * 0.3f, cy - fu * 0.4f),
+            radius = faceR * 1.3f
+        ),
+        faceR, Offset(cx, cy)
+    )
+    // rim
+    drawCircle(SKIN_DARK.copy(alpha = 0.4f), faceR, Offset(cx, cy), style = Stroke(2.5f))
+
+    // ── eyes ──────────────────────────────────────────────────────
+    val eyeSpacing = fu * 0.9f
+    val eyeY       = cy - fu * 0.4f
+
+    // ── sad eyebrows (angled inward & down on sides) ──────────────
+    //    happy eyebrows (higher, slight arch)
+    for (side in listOf(-1f, 1f)) {
+        val bx     = cx + side * eyeSpacing
+        // sad: inner end lower than outer; happy: inner end higher
+        val browIY = eyeY - fu * lerp(0.55f, 0.85f, mood)          // inner Y
+        val browOY = eyeY - fu * lerp(0.85f, 0.75f, mood)          // outer Y
+        val browIX = bx - side * fu * 0.55f
+        val browOX = bx + side * fu * 0.55f
+        drawPath(Path().apply {
+            moveTo(browIX, browIY); lineTo(browOX, browOY)
+        }, BROW_COL, style = Stroke(fu * 0.18f, cap = StrokeCap.Round))
+    }
+
+    // ── eye whites ────────────────────────────────────────────────
+    for (side in listOf(-1f, 1f)) {
+        val ex = cx + side * eyeSpacing
+        val eyeWR = fu * 0.52f
+        // sad: slightly squinted (smaller)
+        val eyeH  = eyeWR * lerp(0.75f, 1.0f, mood)
+        drawOval(EYE_WHITE,
+            Offset(ex - eyeWR, eyeY - eyeH),
+            Size(eyeWR * 2f, eyeH * 2f))
+        drawOval(EYE_WHITE.copy(alpha = 0.15f),
+            Offset(ex - eyeWR, eyeY - eyeH),
+            Size(eyeWR * 2f, eyeH * 2f),
+            style = Stroke(1.5f))
+
+        // ── iris ──────────────────────────────────────────────────
+        val irisR = eyeWR * 0.62f
+        // sad: look slightly down; happy: look center
+        val irisOffY = fu * lerp(0.12f, 0.0f, mood)
+        drawCircle(EYE_IRIS, irisR, Offset(ex, eyeY + irisOffY))
+        // iris gradient
+        drawCircle(
+            Brush.radialGradient(
+                listOf(Color(0xFF6AB0FF), EYE_IRIS, Color(0xFF2255AA)),
+                center = Offset(ex, eyeY + irisOffY), radius = irisR
+            ),
+            irisR, Offset(ex, eyeY + irisOffY)
+        )
+        // pupil — dilated when happy, constricted when sad
+        val pupilR = irisR * lerp(0.55f, 0.68f, mood)
+        drawCircle(EYE_PUPIL, pupilR, Offset(ex, eyeY + irisOffY))
+        // specular
+        drawCircle(Color.White.copy(alpha = 0.9f), pupilR * 0.28f,
+            Offset(ex - pupilR * 0.3f, eyeY + irisOffY - pupilR * 0.3f))
+        drawCircle(Color.White.copy(alpha = 0.5f), pupilR * 0.14f,
+            Offset(ex + pupilR * 0.2f, eyeY + irisOffY + pupilR * 0.15f))
+
+        // ── blink lid ─────────────────────────────────────────────
+        val blinkLid = blinkA * mood    // only blink when happy
+        if (blinkLid > 0.01f) {
+            val lidH = eyeH * 2f * blinkLid
+            drawOval(SKIN_COL,
+                Offset(ex - eyeWR, eyeY - eyeH),
+                Size(eyeWR * 2f, lidH))
+        }
+
+        // ── sad: tear drop ────────────────────────────────────────
+        if (mood < 0.5f) {
+            val tearAlpha = (1f - mood * 2f)
+            val tearX = cx + side * (eyeSpacing + fu * 0.1f)
+            val tearTopY = eyeY + fu * 0.55f
+            val tearH    = fu * 0.7f * tearAlpha
+            val tearPath = Path().apply {
+                moveTo(tearX, tearTopY)
+                quadraticBezierTo(tearX + side * fu * 0.18f,
+                    tearTopY + tearH * 0.5f, tearX, tearTopY + tearH)
+                quadraticBezierTo(tearX - side * fu * 0.18f,
+                    tearTopY + tearH * 0.5f, tearX, tearTopY)
+                close()
+            }
+            drawPath(tearPath, TEAR_COL.copy(alpha = tearAlpha * 0.75f))
+        }
+    }
+
+    // ── nose (small) ──────────────────────────────────────────────
+    val noseY = cy + fu * 0.2f
+    drawPath(Path().apply {
+        moveTo(cx - fu * 0.18f, noseY)
+        quadraticBezierTo(cx - fu * 0.32f, noseY + fu * 0.28f,
+            cx - fu * 0.12f, noseY + fu * 0.32f)
+    }, SKIN_DARK.copy(alpha = 0.55f), style = Stroke(fu * 0.13f, cap = StrokeCap.Round))
+
+    // ── MOUTH ─────────────────────────────────────────────────────
+    val mouthY = cy + fu * 0.72f
+    val mouthW = fu * 1.1f
+
+    // interpolate control point:
+    //   sad  → curve goes UP  (frown: mid point above endpoints)
+    //   happy → curve goes DOWN (smile: mid point below endpoints)
+    val mouthMidY = mouthY + lerp(-fu * 0.55f, fu * 0.65f, mood)
+
+    if (mood > 0.15f) {
+        // when happy enough: draw open mouth with teeth & tongue
+        val openAmount = ((mood - 0.15f) / 0.85f).coerceIn(0f, 1f)
+        val lipH = fu * 0.55f * openAmount
+
+        // mouth cavity
+        val mouthPath = Path().apply {
+            moveTo(cx - mouthW, mouthY)
+            quadraticBezierTo(cx, mouthMidY, cx + mouthW, mouthY)
+            quadraticBezierTo(cx, mouthMidY + lipH, cx - mouthW, mouthY)
+            close()
+        }
+        drawPath(mouthPath, Color(0xFF2A1010))
+
+        // teeth strip
+        if (openAmount > 0.3f) {
+            val teethH = lipH * 0.5f * openAmount
+            val teethPath = Path().apply {
+                moveTo(cx - mouthW * 0.85f, mouthY + fu * 0.1f)
+                quadraticBezierTo(cx, mouthMidY * 0.35f + mouthY * 0.65f,
+                    cx + mouthW * 0.85f, mouthY + fu * 0.1f)
+                lineTo(cx + mouthW * 0.85f, mouthY + fu * 0.1f + teethH)
+                quadraticBezierTo(cx, mouthMidY * 0.4f + mouthY * 0.6f + teethH,
+                    cx - mouthW * 0.85f, mouthY + fu * 0.1f + teethH)
+                close()
+            }
+            drawPath(teethPath, TEETH_COL)
+            // teeth dividers
+            for (i in 1..2) {
+                val tx = cx - mouthW * 0.28f + i * mouthW * 0.28f
+                drawLine(SKIN_DARK.copy(alpha = 0.2f),
+                    Offset(tx, mouthY + fu * 0.1f),
+                    Offset(tx, mouthY + fu * 0.1f + teethH * 0.8f),
+                    strokeWidth = 1.5f)
+            }
+
+            // tongue
+            val tongueY  = mouthMidY * 0.5f + mouthY * 0.5f + teethH
+            val tongueRX = mouthW * 0.52f * openAmount
+            val tongueRY = fu * 0.38f * openAmount
+            drawOval(
+                Brush.radialGradient(
+                    listOf(Color(0xFFFF9AAA), TONGUE_COL),
+                    center = Offset(cx, tongueY), radius = tongueRX
+                ),
+                Offset(cx - tongueRX, tongueY - tongueRY),
+                Size(tongueRX * 2f, tongueRY * 2f)
+            )
+            // tongue crease
+            drawLine(MOUTH_COL.copy(alpha = 0.35f),
+                Offset(cx, tongueY - tongueRY * 0.5f),
+                Offset(cx, tongueY + tongueRY * 0.7f),
+                strokeWidth = fu * 0.1f, cap = StrokeCap.Round)
+        }
+    }
+
+    // upper lip path (both happy & sad)
+    drawPath(Path().apply {
+        moveTo(cx - mouthW, mouthY)
+        quadraticBezierTo(cx, mouthMidY, cx + mouthW, mouthY)
+    }, MOUTH_COL.copy(alpha = 0.85f),
+        style = Stroke(fu * 0.22f, cap = StrokeCap.Round))
+
+    // ── cheeks (only when happy) ──────────────────────────────────
+    if (mood > 0.3f) {
+        val cheekA = ((mood - 0.3f) / 0.7f).coerceIn(0f, 1f)
+        for (side in listOf(-1f, 1f)) {
+            val chX = cx + side * fu * 1.6f
+            val chY = cy + fu * 0.45f
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(CHEEK_COL.copy(alpha = cheekA * 0.55f), Color.Transparent),
+                    center = Offset(chX, chY), radius = fu * 0.75f
+                ),
+                fu * 0.75f, Offset(chX, chY)
+            )
+        }
+    }
+
+    // ── forehead shine ────────────────────────────────────────────
+    drawCircle(Color.White.copy(alpha = 0.18f),
+        faceR * 0.35f, Offset(cx - fu * 0.5f, cy - fu * 1.0f))
+}
+
+// helper: lerp between two floats
+private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t.coerceIn(0f, 1f)
+
+// ══════════════════════════════════════════════════════════════════
+//  LOGIN CARD
+// ══════════════════════════════════════════════════════════════════
+@Composable
+private fun LoginCard(
+    email: String, onEmailChange: (String) -> Unit,
+    password: String, onPasswordChange: (String) -> Unit,
+    passwordVisible: Boolean, onVisToggle: () -> Unit,
+    isLoading: Boolean,
+    glowA: Float, pulse: Float,
+    errorMessage: String?,
+    onLogin: () -> Unit, onGoogleLogin: () -> Unit, onSignUp: () -> Unit
+) {
+    val borderAlpha = (glowA * pulse * 0.85f).coerceIn(0.18f, 0.85f)
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // connector line
+        Box(modifier = Modifier
+            .width(2.dp).height(18.dp)
+            .align(Alignment.TopCenter)
+            .background(ACCENT.copy(alpha = 0.4f * glowA))
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(top = 16.dp)
+                .shadow(36.dp, RoundedCornerShape(28.dp),
+                    spotColor = ACCENT.copy(alpha = 0.28f * glowA)),
+            shape  = RoundedCornerShape(28.dp),
+            color  = CARD_BG,
+            border = androidx.compose.foundation.BorderStroke(
+                1.5.dp,
+                Brush.verticalGradient(listOf(
+                    ACCENT.copy(alpha = borderAlpha * 0.85f),
+                    ACCENT.copy(alpha = borderAlpha * 0.25f),
+                    Color.Transparent
+                ))
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("Welcome Back", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+                        color = Color.White, letterSpacing = (-0.5).sp)
+                    Text("Sign in to FinWallet", fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.35f))
+                }
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.07f))
+
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    LampField(email, onEmailChange, "Email", "you@example.com",
+                        KeyboardType.Email,
+                        leadingIcon = { Icon(Icons.Default.Email, null, tint = HINT_COL,
+                            modifier = Modifier.size(18.dp)) })
+                    LampField(password, onPasswordChange, "Password", "••••••••",
+                        isPassword = true, passwordVisible = passwordVisible,
+                        onVisibilityToggle = onVisToggle,
+                        leadingIcon = { Icon(Icons.Default.Lock, null, tint = HINT_COL,
+                            modifier = Modifier.size(18.dp)) })
+                }
+
+                Button(
+                    onClick = onLogin,
+                    enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor         = ACCENT,
+                        disabledContainerColor = ACCENT.copy(alpha = 0.28f)
+                    )
+                ) {
+                    if (isLoading)
+                        CircularProgressIndicator(Modifier.size(22.dp), Color.White, 2.dp)
+                    else Text("Sign In", fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF1A0800), fontSize = 16.sp, letterSpacing = 0.5.sp)
+                }
+
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HorizontalDivider(Modifier.weight(1f), color = Color.White.copy(alpha = 0.07f))
+                    Text("or", color = Color.White.copy(alpha = 0.25f), fontSize = 12.sp)
+                    HorizontalDivider(Modifier.weight(1f), color = Color.White.copy(alpha = 0.07f))
+                }
+
+                OutlinedButton(
+                    onClick = onGoogleLogin, enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp, Color.White.copy(alpha = 0.12f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
+                    Text("🔍", fontSize = 16.sp); Spacer(Modifier.width(8.dp))
+                    Text("Continue with Google", fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.65f))
+                }
+
+                Row(Modifier.fillMaxWidth(), Arrangement.Center, Alignment.CenterVertically) {
+                    Text("No account?", color = Color.White.copy(alpha = 0.32f), fontSize = 13.sp)
+                    TextButton(onClick = onSignUp) {
+                        Text("Sign Up", color = ACCENT, fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                AnimatedVisibility(errorMessage != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit  = shrinkVertically() + fadeOut()
+                ) {
+                    Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF2D1010)) {
+                        Row(Modifier.padding(12.dp), Arrangement.spacedBy(8.dp),
+                            Alignment.CenterVertically) {
+                            Icon(Icons.Default.ErrorOutline, null,
+                                tint = Color(0xFFFF6B6B), modifier = Modifier.size(16.dp))
+                            Text(errorMessage ?: "", color = Color(0xFFFF6B6B), fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  TEXT FIELD
+// ══════════════════════════════════════════════════════════════════
+@Composable
+private fun LampField(
+    value: String, onValueChange: (String) -> Unit,
+    label: String, placeholder: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    isPassword: Boolean = false,
+    passwordVisible: Boolean = false,
+    onVisibilityToggle: (() -> Unit)? = null,
+    leadingIcon: (@Composable () -> Unit)? = null
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(label, color = Color.White.copy(alpha = 0.45f), fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+        OutlinedTextField(
+            value = value, onValueChange = onValueChange,
+            placeholder = { Text(placeholder, color = HINT_COL, fontSize = 13.sp) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            visualTransformation = if (isPassword && !passwordVisible)
+                PasswordVisualTransformation() else VisualTransformation.None,
+            leadingIcon = leadingIcon,
+            trailingIcon = if (isPassword) ({
+                IconButton(onClick = { onVisibilityToggle?.invoke() }) {
+                    Icon(if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        null, tint = HINT_COL, modifier = Modifier.size(17.dp))
+                }
+            }) else null,
+            textStyle = TextStyle(fontSize = 14.sp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor      = ACCENT.copy(alpha = 0.7f),
+                unfocusedBorderColor    = Color.White.copy(alpha = 0.09f),
+                focusedTextColor        = Color.White,
+                unfocusedTextColor      = Color.White.copy(alpha = 0.82f),
+                cursorColor             = ACCENT,
+                focusedContainerColor   = INPUT_BG,
+                unfocusedContainerColor = INPUT_BG.copy(alpha = 0.55f)
+            )
+        )
+    }
+}
