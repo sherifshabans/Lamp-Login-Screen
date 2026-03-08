@@ -58,3 +58,50 @@ This adds personality and emotional feedback to the authentication flow.
 ---
 
 ## 📦 Architecture
+
+
+
+presentation
+└── auth
+├── LampLoginScreen
+├── LoginCard
+├── LampField
+└── Canvas Face Renderer
+
+
+State is managed through **LoginViewModel** using reactive state flows.
+
+---
+
+## 💡 Why This UI?
+
+Login screens are usually boring.
+
+This project explores how **motion, personality, and interaction** can improve the first impression of an app.
+
+The lamp behaves like a small character that reacts to the user.
+
+---
+
+## 📸 Preview
+
+Lamp Off (Sad)  
+Lamp On (Happy + Login Form)
+
+---
+
+## 🚀 Future Improvements
+
+- Finger tracking animation for the cord
+- Sound effects when switching the lamp
+- Face reacting to typing errors
+- More expressive emotions
+
+---
+
+## 👨‍💻 Author
+
+**ElSharif Shaban**
+
+Android Developer  
+Passionate about building creative UI experiences with Jetpack Compose.
