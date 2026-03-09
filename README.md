@@ -89,6 +89,11 @@ Lamp Off (Sad)
 Lamp On (Happy + Login Form)
 
 ---
+## 🎬 Demo
+
+https://github.com/sherifshabans/Lamp-Login-Screen/blob/main/demo.mp4
+
+---
 
 ## 🚀 Future Improvements
 
