@@ -1,5 +1,4 @@
 
-https://github.com/user-attachments/assets/0c0fb0f8-0ec5-4615-9609-60a3e2df5e06
 # Lamp-Login-Screen
 
 # 💡 Lamp Login Screen – Jetpack Compose
@@ -96,7 +95,7 @@ Lamp On (Happy + Login Form)
 ---
 ## 🎬 Demo
 
-<video src="https://github.com/sherifshabans/Lamp-Login-Screen/blob/main/demo.mp4" controls width="600"></video>
+https://github.com/user-attachments/assets/0c0fb0f8-0ec5-4615-9609-60a3e2df5e06
 
 ---
 
