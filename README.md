@@ -1,3 +1,5 @@
+
+https://github.com/user-attachments/assets/0c0fb0f8-0ec5-4615-9609-60a3e2df5e06
 # Lamp-Login-Screen
 
 # 💡 Lamp Login Screen – Jetpack Compose
@@ -9,6 +11,9 @@ Instead of a traditional login UI, this screen introduces a **gamified interacti
 ---
 
 ## ✨ Features
+
+
+
 
 - 🎨 Fully custom UI built with **Jetpack Compose Canvas**
 - 💡 Interactive **lamp switch animation**
@@ -91,7 +96,7 @@ Lamp On (Happy + Login Form)
 ---
 ## 🎬 Demo
 
-https://github.com/sherifshabans/Lamp-Login-Screen/blob/main/demo.mp4
+<video src="https://github.com/sherifshabans/Lamp-Login-Screen/blob/main/demo.mp4" controls width="600"></video>
 
 ---
 
