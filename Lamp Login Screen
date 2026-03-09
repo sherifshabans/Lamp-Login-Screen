@@ -1,3 +1,4 @@
+package com.elsharif.finwallet.presentation.auth
 
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,17 +59,15 @@ private val INPUT_BG    = Color(0xFF1A1E28)
 private val HINT_COL    = Color(0xFF4A5068)
 
 // Face colors
-private val SKIN_COL    = Color(0xFFFFD59E)   // warm skin tone
-private val SKIN_DARK   = Color(0xFFE5B880)   // shadow
+private val SKIN_COL    = Color(0xFFFFD59E)
+private val SKIN_DARK   = Color(0xFFE5B880)
 private val EYE_WHITE   = Color(0xFFFFF8F0)
-private val EYE_IRIS    = Color(0xFF4A90D9)   // blue iris
+private val EYE_IRIS    = Color(0xFF4A90D9)
 private val EYE_PUPIL   = Color(0xFF1A1A1A)
 private val BROW_COL    = Color(0xFF6B4C2A)
 private val MOUTH_COL   = Color(0xFFCC6655)
-private val TONGUE_COL  = Color(0xFFFF7A8A)
 private val TEETH_COL   = Color(0xFFFFFAF5)
 private val CHEEK_COL   = Color(0xFFFFAA99)
-private val TEAR_COL    = Color(0xFF88BBFF)
 
 // ══════════════════════════════════════════════════════════════════
 //  MAIN SCREEN
@@ -90,7 +89,7 @@ fun LampLoginScreen(
     var password        by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // mood: 0 = sad (off), 1 = happy (on)
+    // mood: 0 = نايم (off), 1 = صاحي (on)
     val mood by animateFloatAsState(
         targetValue   = if (isOn) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.5f, stiffness = 180f),
@@ -118,7 +117,7 @@ fun LampLoginScreen(
         infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "pulse"
     )
-    // blink animation when happy
+    // blink animation when awake
     val blinkA by inf.animateFloat(
         0f, 1f,
         infiniteRepeatable(
@@ -183,18 +182,15 @@ fun LampLoginScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
 
             // ── LAMP ──────────────────────────────────────────
-            // The whole lamp + cord area is one tall box.
-            // The cord is draggable anywhere inside it.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(360.dp),
+                    .height(320.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                // ── Canvas: draws lamp + cord ─────────────────
                 Canvas(
                     modifier = Modifier
                         .width(240.dp)
@@ -274,7 +270,6 @@ fun LampLoginScreen(
                     drawLine(POLE_COL.copy(alpha = 0.3f),
                         Offset(cx - shdBotHalf, shadeBottomY), Offset(cx + shdBotHalf, shadeBottomY),
                         4f, cap = StrokeCap.Round)
-                    // shade edge highlights
                     drawLine(Color.White.copy(alpha = 0.06f),
                         Offset(cx - shdTopHalf, shadeTopY), Offset(cx - shdBotHalf, shadeBottomY), 2f)
                     drawLine(Color.White.copy(alpha = 0.06f),
@@ -310,15 +305,13 @@ fun LampLoginScreen(
                         Offset(cordX1 - 3f, cordY1 - 3f))
                 }
 
-                // ── DRAG ZONE = full tall box = entire cord area ──
-                // User can touch ANYWHERE in this box to drag the cord.
+                // ── DRAG ZONE ──
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.55f)
                         .fillMaxHeight()
                         .align(Alignment.TopCenter)
-                        // push the touch zone down to start at shade bottom (~50% height)
-                        .padding(top = (360 * 0.50f).dp)
+                        .padding(top = (320 * 0.50f).dp)
                         .pointerInput(Unit) {
                             detectDragGestures(
                                 onDragEnd    = { isDragging = false; if (cordPull > 0.42f) isOn = !isOn; cordPull = 0f },
@@ -336,7 +329,7 @@ fun LampLoginScreen(
             // hint when off
             AnimatedVisibility(!showCard, enter = fadeIn(), exit = fadeOut(tween(180))) {
                 Text("↑  pull the cord  ↑",
-                    modifier      = Modifier.padding(top = 6.dp, bottom = 20.dp),
+                    modifier      = Modifier.padding(top = 4.dp, bottom = 12.dp),
                     color         = Color.White.copy(alpha = 0.2f),
                     fontSize      = 12.sp,
                     fontWeight    = FontWeight.Medium,
@@ -387,7 +380,7 @@ fun LampLoginScreen(
 
 // ══════════════════════════════════════════════════════════════════
 //  FACE DRAWING
-//  mood 0 = sad, 1 = happy  — everything lerps between the two
+//  mood 0 = نايم (off), 1 = صاحي/مبسوط (on)
 // ══════════════════════════════════════════════════════════════════
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
     cx: Float, cy: Float, fu: Float,
@@ -395,9 +388,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
 ) {
     // ── face circle (skin) ────────────────────────────────────────
     val faceR = fu * 2.0f
-    // shadow
     drawCircle(Color.Black.copy(alpha = 0.25f), faceR + 4f, Offset(cx + 2f, cy + 3f))
-    // base skin
     drawCircle(
         Brush.radialGradient(
             listOf(SKIN_COL, SKIN_DARK),
@@ -406,20 +397,18 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
         ),
         faceR, Offset(cx, cy)
     )
-    // rim
     drawCircle(SKIN_DARK.copy(alpha = 0.4f), faceR, Offset(cx, cy), style = Stroke(2.5f))
 
-    // ── eyes ──────────────────────────────────────────────────────
+    // ── eyebrows ──────────────────────────────────────────────────
     val eyeSpacing = fu * 0.9f
     val eyeY       = cy - fu * 0.4f
 
-    // ── sad eyebrows (angled inward & down on sides) ──────────────
-    //    happy eyebrows (higher, slight arch)
     for (side in listOf(-1f, 1f)) {
         val bx     = cx + side * eyeSpacing
-        // sad: inner end lower than outer; happy: inner end higher
-        val browIY = eyeY - fu * lerp(0.55f, 0.85f, mood)          // inner Y
-        val browOY = eyeY - fu * lerp(0.85f, 0.75f, mood)          // outer Y
+        // نايم: حاجبين مسترخيين مستويين
+        // صاحي: حاجبين مرفوعين شوية
+        val browIY = eyeY - fu * lerp(0.60f, 0.85f, mood)
+        val browOY = eyeY - fu * lerp(0.62f, 0.75f, mood)
         val browIX = bx - side * fu * 0.55f
         val browOX = bx + side * fu * 0.55f
         drawPath(Path().apply {
@@ -429,10 +418,10 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
 
     // ── eye whites ────────────────────────────────────────────────
     for (side in listOf(-1f, 1f)) {
-        val ex = cx + side * eyeSpacing
+        val ex    = cx + side * eyeSpacing
         val eyeWR = fu * 0.52f
-        // sad: slightly squinted (smaller)
         val eyeH  = eyeWR * lerp(0.75f, 1.0f, mood)
+
         drawOval(EYE_WHITE,
             Offset(ex - eyeWR, eyeY - eyeH),
             Size(eyeWR * 2f, eyeH * 2f))
@@ -442,11 +431,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
             style = Stroke(1.5f))
 
         // ── iris ──────────────────────────────────────────────────
-        val irisR = eyeWR * 0.62f
-        // sad: look slightly down; happy: look center
-        val irisOffY = fu * lerp(0.12f, 0.0f, mood)
-        drawCircle(EYE_IRIS, irisR, Offset(ex, eyeY + irisOffY))
-        // iris gradient
+        val irisR    = eyeWR * 0.62f
+        val irisOffY = fu * lerp(0.08f, 0.0f, mood)
         drawCircle(
             Brush.radialGradient(
                 listOf(Color(0xFF6AB0FF), EYE_IRIS, Color(0xFF2255AA)),
@@ -454,43 +440,48 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
             ),
             irisR, Offset(ex, eyeY + irisOffY)
         )
-        // pupil — dilated when happy, constricted when sad
         val pupilR = irisR * lerp(0.55f, 0.68f, mood)
         drawCircle(EYE_PUPIL, pupilR, Offset(ex, eyeY + irisOffY))
-        // specular
         drawCircle(Color.White.copy(alpha = 0.9f), pupilR * 0.28f,
             Offset(ex - pupilR * 0.3f, eyeY + irisOffY - pupilR * 0.3f))
         drawCircle(Color.White.copy(alpha = 0.5f), pupilR * 0.14f,
             Offset(ex + pupilR * 0.2f, eyeY + irisOffY + pupilR * 0.15f))
 
-        // ── blink lid ─────────────────────────────────────────────
-        val blinkLid = blinkA * mood    // only blink when happy
-        if (blinkLid > 0.01f) {
-            val lidH = eyeH * 2f * blinkLid
+        // ── eyelid ────────────────────────────────────────────────
+        // نايم: عيون مغمضة تماماً | صاحي: بيرمش بس
+        val sleepLid = (1f - mood).coerceIn(0f, 1f)
+        val blinkLid = if (mood > 0.5f) blinkA else 0f
+        val finalLid = maxOf(blinkLid, sleepLid)
+
+        if (finalLid > 0.01f) {
+            val lidH = eyeH * 2f * finalLid
             drawOval(SKIN_COL,
                 Offset(ex - eyeWR, eyeY - eyeH),
                 Size(eyeWR * 2f, lidH))
         }
 
-        // ── sad: tear drop ────────────────────────────────────────
-        if (mood < 0.5f) {
-            val tearAlpha = (1f - mood * 2f)
-            val tearX = cx + side * (eyeSpacing + fu * 0.1f)
-            val tearTopY = eyeY + fu * 0.55f
-            val tearH    = fu * 0.7f * tearAlpha
-            val tearPath = Path().apply {
-                moveTo(tearX, tearTopY)
-                quadraticBezierTo(tearX + side * fu * 0.18f,
-                    tearTopY + tearH * 0.5f, tearX, tearTopY + tearH)
-                quadraticBezierTo(tearX - side * fu * 0.18f,
-                    tearTopY + tearH * 0.5f, tearX, tearTopY)
-                close()
+        // ── Z Z Z (نايم) ─────────────────────────────────────────
+        if (mood < 0.4f && side > 0f) {
+            val sleepAlpha = (1f - mood * 2.5f).coerceIn(0f, 1f)
+            val zStartX = cx + fu * 2.3f
+            val zStartY = cy - fu * 1.1f
+            for (i in 0..1) {
+                val scale  = (0.7f + i * 0.45f) * sleepAlpha
+                val zSize  = fu * 0.55f * scale
+                val offsetX = i * fu * 0.55f
+                val offsetY = -(i * fu * 0.55f)
+                drawPath(Path().apply {
+                    moveTo(zStartX + offsetX, zStartY + offsetY)
+                    lineTo(zStartX + zSize + offsetX, zStartY + offsetY)
+                    lineTo(zStartX + offsetX, zStartY + zSize * 0.6f + offsetY)
+                    lineTo(zStartX + zSize + offsetX, zStartY + zSize * 0.6f + offsetY)
+                }, Color.White.copy(alpha = sleepAlpha * 0.45f * (1f - i * 0.25f)),
+                    style = Stroke(fu * 0.11f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
-            drawPath(tearPath, TEAR_COL.copy(alpha = tearAlpha * 0.75f))
         }
     }
 
-    // ── nose (small) ──────────────────────────────────────────────
+    // ── nose ──────────────────────────────────────────────────────
     val noseY = cy + fu * 0.2f
     drawPath(Path().apply {
         moveTo(cx - fu * 0.18f, noseY)
@@ -502,15 +493,12 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
     val mouthY = cy + fu * 0.72f
     val mouthW = fu * 1.1f
 
-    // interpolate control point:
-    //   sad  → curve goes UP  (frown: mid point above endpoints)
-    //   happy → curve goes DOWN (smile: mid point below endpoints)
-    val mouthMidY = mouthY + lerp(-fu * 0.55f, fu * 0.65f, mood)
+    // نايم: خط مستوي تقريباً | صاحي: ابتسامة
+    val mouthMidY = mouthY + lerp(-fu * 0.05f, fu * 0.65f, mood)
 
     if (mood > 0.15f) {
-        // when happy enough: draw open mouth with teeth & tongue
         val openAmount = ((mood - 0.15f) / 0.85f).coerceIn(0f, 1f)
-        val lipH = fu * 0.55f * openAmount
+        val lipH = fu * 0.45f * openAmount
 
         // mouth cavity
         val mouthPath = Path().apply {
@@ -521,56 +509,41 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
         }
         drawPath(mouthPath, Color(0xFF2A1010))
 
-        // teeth strip
-        if (openAmount > 0.3f) {
-            val teethH = lipH * 0.5f * openAmount
+        // أسنان واضحة — بدون لسان
+        if (openAmount > 0.2f) {
+            val teethH = lipH * 0.9f * openAmount
             val teethPath = Path().apply {
-                moveTo(cx - mouthW * 0.85f, mouthY + fu * 0.1f)
-                quadraticBezierTo(cx, mouthMidY * 0.35f + mouthY * 0.65f,
-                    cx + mouthW * 0.85f, mouthY + fu * 0.1f)
-                lineTo(cx + mouthW * 0.85f, mouthY + fu * 0.1f + teethH)
-                quadraticBezierTo(cx, mouthMidY * 0.4f + mouthY * 0.6f + teethH,
-                    cx - mouthW * 0.85f, mouthY + fu * 0.1f + teethH)
+                moveTo(cx - mouthW * 0.85f, mouthY + fu * 0.08f)
+                quadraticBezierTo(cx, mouthMidY * 0.4f + mouthY * 0.6f,
+                    cx + mouthW * 0.85f, mouthY + fu * 0.08f)
+                lineTo(cx + mouthW * 0.85f, mouthY + fu * 0.08f + teethH)
+                quadraticBezierTo(cx, mouthMidY * 0.45f + mouthY * 0.55f + teethH,
+                    cx - mouthW * 0.85f, mouthY + fu * 0.08f + teethH)
                 close()
             }
             drawPath(teethPath, TEETH_COL)
-            // teeth dividers
-            for (i in 1..2) {
-                val tx = cx - mouthW * 0.28f + i * mouthW * 0.28f
-                drawLine(SKIN_DARK.copy(alpha = 0.2f),
-                    Offset(tx, mouthY + fu * 0.1f),
-                    Offset(tx, mouthY + fu * 0.1f + teethH * 0.8f),
-                    strokeWidth = 1.5f)
+            // فواصل الأسنان — 3 خطوط واضحة
+            for (i in 1..3) {
+                val tx = cx - mouthW * 0.75f + i * mouthW * 0.5f
+                drawLine(
+                    SKIN_DARK.copy(alpha = 0.38f),
+                    Offset(tx, mouthY + fu * 0.08f),
+                    Offset(tx, mouthY + fu * 0.08f + teethH * 0.88f),
+                    strokeWidth = 1.8f
+                )
             }
-
-            // tongue
-            val tongueY  = mouthMidY * 0.5f + mouthY * 0.5f + teethH
-            val tongueRX = mouthW * 0.52f * openAmount
-            val tongueRY = fu * 0.38f * openAmount
-            drawOval(
-                Brush.radialGradient(
-                    listOf(Color(0xFFFF9AAA), TONGUE_COL),
-                    center = Offset(cx, tongueY), radius = tongueRX
-                ),
-                Offset(cx - tongueRX, tongueY - tongueRY),
-                Size(tongueRX * 2f, tongueRY * 2f)
-            )
-            // tongue crease
-            drawLine(MOUTH_COL.copy(alpha = 0.35f),
-                Offset(cx, tongueY - tongueRY * 0.5f),
-                Offset(cx, tongueY + tongueRY * 0.7f),
-                strokeWidth = fu * 0.1f, cap = StrokeCap.Round)
+            // لا يوجد لسان
         }
     }
 
-    // upper lip path (both happy & sad)
+    // upper lip
     drawPath(Path().apply {
         moveTo(cx - mouthW, mouthY)
         quadraticBezierTo(cx, mouthMidY, cx + mouthW, mouthY)
     }, MOUTH_COL.copy(alpha = 0.85f),
         style = Stroke(fu * 0.22f, cap = StrokeCap.Round))
 
-    // ── cheeks (only when happy) ──────────────────────────────────
+    // ── cheeks (صاحي فقط) ────────────────────────────────────────
     if (mood > 0.3f) {
         val cheekA = ((mood - 0.3f) / 0.7f).coerceIn(0f, 1f)
         for (side in listOf(-1f, 1f)) {
@@ -591,7 +564,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFace(
         faceR * 0.35f, Offset(cx - fu * 0.5f, cy - fu * 1.0f))
 }
 
-// helper: lerp between two floats
+// helper
 private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t.coerceIn(0f, 1f)
 
 // ══════════════════════════════════════════════════════════════════
@@ -610,7 +583,6 @@ private fun LoginCard(
     val borderAlpha = (glowA * pulse * 0.85f).coerceIn(0.18f, 0.85f)
 
     Box(modifier = Modifier.fillMaxWidth()) {
-        // connector line
         Box(modifier = Modifier
             .width(2.dp).height(18.dp)
             .align(Alignment.TopCenter)
